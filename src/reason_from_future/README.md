@@ -74,4 +74,4 @@ To support a new problem domain, follow these steps:
 
 ---
 
-For more details, refer to `src/reason_from_future/core.py` and the original design in `PLANS/inital_setup.md`.
+For more details, refer to `src/reason_from_future/core.py` the original design in `PLANS/inital_setup.md`, and the original paper in `PLANS/ReasonfromFuture-ReverseThoughtChainEnhancesLLMReasoning2506.03673v1.md`.
