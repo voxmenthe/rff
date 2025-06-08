@@ -24,6 +24,9 @@ fi
 echo "Syncing dependencies and creating virtual environment..."
 uv sync
 
+# Install the project in editable mode
+uv pip install -e .
+
 # Create and install the IPython kernel for the project
 echo "Installing Jupyter kernel..."
 uv run python -m ipykernel install --user --name=cot-scaffold --display-name "CoT Scaffold"

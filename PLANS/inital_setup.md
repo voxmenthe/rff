@@ -21,21 +21,29 @@ import re
 import json
 import textwrap
 import uuid
-
+from google import genai
+import os
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║  0. Glue to the LLM endpoint                                             ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 def llm_call(prompt: str,
-             model: str = "gpt-4o",
+             model: str = "gemini-2.5-flash-preview-05-20",
              max_tokens: int = 256,
              temperature: float = 0.3) -> str:
     """
-    Thin placeholder around your favourite SDK.
-    In a real stack this would (a) stream tokens, (b) check usage quotas,
+    Thin placeholder around LLM SDK.
+    In a production stack this would (a) stream tokens, (b) check usage quotas,
     (c) retry on 5xx.
     """
-    raise NotImplementedError("hook up OpenAI / vLLM / LM Studio here")
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    gemini_model_name = "gemini-2.5-flash-preview-05-20"
+    response = client.models.generate_content(
+        model=gemini_model_name,
+        contents=[prompt]
+    )
+    return response.text
 
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
