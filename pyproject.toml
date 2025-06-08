@@ -1,0 +1,120 @@
+[project]
+name = "cot-scaffold"
+version = "0.1.0"
+description = "CoT Scaffold"
+readme = "README.md"
+requires-python = ">=3.13.3,<3.14"
+authors = [
+    {name = "Jeff Coggshall", email = "alocalminima@gmail.com"}
+]
+
+dependencies = [
+    "beautifulsoup4",
+    "db-dtypes",
+    "chromium",
+    "einops",
+    "fastapi",
+    "gunicorn", 
+    "google-cloud-aiplatform",
+    "htmltools",
+    "ipykernel",
+    "ipywidgets",
+    "instructor",
+    "matplotlib",
+    "mechanicalsoup",
+    "notebook",
+    "numpy",
+    "playwright",
+    "python-json-logger",
+    "python-dotenv",
+    "pytest-cov",
+    "pandas",
+    "ratelimit",
+    "requests",
+    "requests-html",
+    "scikit-learn",
+    "scrapy",
+    "seaborn",
+    "selenium",
+    "sentence-transformers",
+    "shiny",
+    "torch",
+    "torchvision", 
+    "torchaudio",
+    "transformers",
+    "unsloth",
+    "uvicorn",
+]
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "pytest", 
+    "mypy"
+]
+
+[project.scripts]
+inference_from_dataset = "api.inference.inference_from_dataset:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cot-scaffold"]
+
+[tool.coverage.run]
+source = ["src"]
+
+[tool.ruff]
+line-length = 120
+exclude = [
+    "__pypackages__",
+    "src/DATA/"
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "B",   # flake8-bugbear
+    "I",   # isort
+    "RUF", # ruff-specific rules
+]
+
+ignore = [
+    "B008", # do not perform function call in argument defaults
+    "B904", # raise without from in exception handler
+    "B905", # zip without strict
+    "C901", # too complex
+    "D103", "D104", "D100", "D101", "D107", "D102",
+    "D401", # imperative mood
+    "E501", # line too long
+    "E741", # ambiguous variable name
+    "E402", # module level import not at top of file
+    "N806", "N803",
+    "W191", # indentation contains tabs
+]
+
+line-length = 120
+task-tags = ["TODO", "FIXME", "XXX", "HACK"]
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.extend-per-file-ignores]
+"tests/**/*.py" = [
+    "S101", # asserts allowed in tests
+    "E712", # == for asserts
+    "ARG",  # Unused function args -> fixtures
+    "FBT",  # Don't care about booleans as positional arguments in tests
+    "PLR2004", # Magic value used in comparison
+    "S311", # Standard pseudo-random generators
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "asyncio: mark test as an async test",
+]
