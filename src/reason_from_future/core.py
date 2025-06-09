@@ -59,6 +59,8 @@ def reason_from_future(
     spec: ProblemSpec,
     *,
     max_iters: int = 16,
+    min_iters: int = 1,
+    require_gold: bool = True,
     model: str = "gemini-2.5-flash-preview-05-20",
     verbose: bool = False,
 ) -> str:
@@ -77,6 +79,22 @@ def reason_from_future(
        the goal, request its value, validate it and store it.
     4. Add every successfully‐computed symbol to an ``avoid`` set so the model
        will not propose it again.
+
+    New parameters
+    -------------
+    min_iters: int
+        Minimum number of iterations to execute *before* an un-verified
+        numeric value for the goal may be accepted.  This provides a
+        buffer so the search explores at least a few reverse / forward
+        hops even when a plausible final answer appears immediately.
+
+    require_gold: bool
+        If *True* (default) the traditional behaviour is kept: the loop
+        terminates only when ``spec.verify_final`` confirms the answer
+        matches the gold standard.  When *False* the controller will
+        terminate as soon as the goal passes the *local* numeric check
+        **and** the iteration count is ≥ ``min_iters``.  The caller can
+        then compare the returned answer with the gold label offline.
     """
     state: Workspace = Workspace()
     goal: str = spec.derive_final_target(problem)  # Remains constant.
@@ -98,11 +116,13 @@ def reason_from_future(
         if attempt_counts[symbol] >= max_fails_per_var:
             avoid.add(symbol)
 
-    for _ in range(max_iters):
+    for iter_idx in range(max_iters):
         made_progress: bool = False  # track per-iteration progress
 
         # 1) If we already have the goal, try to verify and finish.
         if spec.check_local(state, goal):
+            if not require_gold and iter_idx >= (min_iters - 1):
+                return str(state[goal])
             ok, answer_from_llm, gold_val_for_debug = spec.verify_final(state)
             if ok:
                 return answer_from_llm
@@ -117,6 +137,8 @@ def reason_from_future(
             direct_raw = llm_call(direct_prompt, model=model, verbose=verbose)
             direct_state = state | spec.parse_workspace_update(direct_raw, state)
             if spec.check_local(direct_state, goal):
+                if not require_gold and iter_idx >= (min_iters - 1):
+                    return str(direct_state[goal])
                 ok, answer_from_llm, gold_val_for_debug = spec.verify_final(direct_state)
                 if ok:
                     return answer_from_llm
@@ -159,6 +181,8 @@ def reason_from_future(
             # We create a temporary state for verification that includes current state + the LLM's attempt.
             temp_state_for_verification = state | parsed_update
             if spec.check_local(temp_state_for_verification, goal): # Check if the goal var from LLM is in a valid format etc.
+                if not require_gold and iter_idx >= (min_iters - 1):
+                    return str(temp_state_for_verification[goal])
                 ok, answer_from_llm, gold_val_for_debug = spec.verify_final(temp_state_for_verification) # Verify using the state that includes the LLM's goal value
                 if ok:
                     return answer_from_llm # Solved!

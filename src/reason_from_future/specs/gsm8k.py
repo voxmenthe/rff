@@ -1,6 +1,7 @@
 """GSM8K ProblemSpec implementation."""
 import json
 import re
+import textwrap
 from typing import Dict, Set, Tuple
 
 from ..core import Workspace, ProblemSpec
@@ -86,6 +87,10 @@ class GSM8KSpec(ProblemSpec):
                         if abs(calculated - float(var_value)) > 1e-4:
                             # Mismatch – reject entire update
                             return Workspace()
+                    except NameError:
+                        # Expression references variables we don't yet know.  Accept the numeric
+                        # value for now and rely on later verification or additional steps.
+                        pass
                     except Exception:
                         return Workspace()
                 elif isinstance(var_value, str):
@@ -167,23 +172,32 @@ class GSM8KSpec(ProblemSpec):
         """
         Generates a prompt to ask the LLM for the step immediately preceding the target.
         'target' here is expected to be "final_answer".
+        Now asks for *multiple* prerequisite variables at once for efficiency.
         """
-        # Ensure problem context (self.question) is included.
-        avoid_list_str = f"Do not choose any of these variables for 'next_variable': {sorted(list(avoid))}." if avoid else ""
-        prompt = f"""You are reasoning backward through a math word problem to find the solution.
-The problem is:
-{self.question}
+        defined_vars = sorted(list(state.keys()))
+        avoid_list_str = (
+            f"Do not choose any of these variables: {sorted(list(avoid))}." if avoid else ""
+        )
+        prompt = textwrap.dedent(
+            f"""
+            You are reasoning backward through a math word problem to find the solution.
+            The problem is:
+            {self.question}
 
-Known facts so far (intermediate variables and their computed values):
-{json.dumps(state, indent=2)}
+            Defined variables with values so far:
+            {json.dumps(state, indent=2)}
 
-The goal is to compute: "{target}".
-What single unknown variable or sub-result (that is not already in 'Known facts so far') needs to be computed immediately before you can determine the value of "{target}"?
-Output your answer as a single JSON object with one key: 'next_variable', where the value is the name of this prerequisite variable. For example: {{"next_variable": "variable_name_here"}}.
-{avoid_list_str}
+            Your final goal is the variable "{target}".
+            Provide up to **three** prerequisite variable names (strings) that must be computed *immediately before* "{target}" can be determined.  These names must NOT already appear in the defined list above.
 
-IMPORTANT: Your *entire response* must be *only* the JSON object described above. Do not include any other text, explanations, reasoning, or conversational remarks before or after the JSON. Adhere strictly to this format.
-"""
+            {avoid_list_str}
+
+            Output a single JSON object with one key exactly named "next_variables" whose value is an array of 1-3 strings. Example:
+            {{"next_variables": ["bonus_science_books", "replacement_science_books"]}}
+
+            IMPORTANT: Respond with ONLY the JSON.
+            """
+        ).strip()
         return prompt
 
     def prompt_forward_step(self, state: Workspace, target_step: str, avoid: Set[str]) -> str:
@@ -192,61 +206,69 @@ IMPORTANT: Your *entire response* must be *only* the JSON object described above
         If target_step is determined to be the final answer, LLM is instructed to use 'final_answer'.
         """
         final_goal_name = self.derive_final_target(self.question)
+        defined_vars = sorted(list(state.keys()))
 
         prompt = f"""You are solving a math word problem step-by-step.
 The problem is:
 {self.question}
 
-Known facts so far (intermediate variables and their computed values):
+Defined variables so far (with values):
 {json.dumps(state, indent=2)}
-
-Your current task is to compute the value for the variable: "{target_step}".
-Based on the problem statement and the known facts, calculate this value.
-If you determine that the value of "{target_step}" is the final answer to the overall problem, use "{self.derive_final_target(self.question)}" as the 'var' in your JSON output. Otherwise, use "{target_step}" as the 'var'.
-
+Undefined variable you must compute now: "{target_step}".
+Avoid inventing synonyms for existing variable names.  Stick to clear snake_case names.
+"""
+        # Additional instruction for the final answer: make expr a pure number
+        if target_step == final_goal_name:
+            prompt += "\nWhen outputting 'final_answer', set 'expr' to the same numeric value as 'value' (do NOT reference other variables)."
+        prompt += textwrap.dedent(f"""
+ 
 Output your answer as a single JSON object with three keys: 'var', 'expr', and 'value'.
-  • 'var'  – either the target variable or "{self.derive_final_target(self.question)}" if it's final.
-  • 'expr' – a Python-style arithmetic expression that evaluates to the value **using only previously
-             known variables** (listed above). If the step is trivial or the final answer, just repeat the
-             numeric value as the expression.
-  • 'value' – the numerical result.
-For example, if asked to compute 'X' and X is the final answer: {{"var": "{self.derive_final_target(self.question)}", "expr": "a + b", "value": 123.45}}
+  • 'var'  – either the target variable or "final_answer" if it's final.
+  • 'expr' – a Python-style arithmetic expression that evaluates to the value **using only previously known variables** (listed above).  If trivial or final, just repeat the numeric value.
+  • 'value' – the numerical result (number type, **not** string).
+
 If asked to compute 'Y' and Y is an intermediate step: {{"var": "Y", "expr": "miles_driven / gallons", "value": 67.89}}
 Ensure the 'value' is a number, not a string containing an expression.
 
-IMPORTANT: Your *entire response* must be *only* the JSON object described above. Do not include any other text, explanations, reasoning, or conversational remarks before or after the JSON. Adhere strictly to this format.
-"""
+When outputting 'final_answer', set 'expr' to the same numeric value as 'value'.
+
+IMPORTANT: Your *entire response* must be *only* the JSON object described above.  No additional commentary.
+""")
         return prompt
 
     def parse_target_step(self, raw_text: str) -> str:
-        """Parse raw LLM output from backward reasoning to get the next target variable name."""
+        """Parse raw LLM output from backward reasoning to get the next target variable name.
+        Supports either {"next_variable": "x"} or {"next_variables": ["x", ...]}.
+        Returns the *first* variable name in the list for compatibility with the controller.
+        """
         clean_raw_text = raw_text.strip()
-        # Attempt 1: Find and parse JSON {"next_variable": "..."}
+        # Attempt 1: Find and parse JSON with next_variables
         try:
-            # Try to find a JSON block, even if embedded
+            match = re.search(r"\{[\s\S]*?next_variables[\s\S]*?\}", clean_raw_text)
+            if match:
+                json_text = match.group(0)
+                json_text = json_text.strip()
+                if json_text.startswith("```json"):
+                    json_text = json_text[7:-3].strip()
+                data = json.loads(json_text)
+                if "next_variables" in data and isinstance(data["next_variables"], list):
+                    for v in data["next_variables"]:
+                        if isinstance(v, str) and v:
+                            return v.strip()
+        except Exception:
+            pass
+        # Fallback to original single-variable extraction
+        try:
             match = re.search(r"\{[\s\S]*?\"next_variable\"\s*:\s*\"(.*?)\"[\s\S]*?\}", clean_raw_text)
             if match:
                 json_like_text = match.group(0)
-                # Clean common LLM quirks around JSON
                 if json_like_text.startswith("```json"):
-                    json_like_text = json_like_text[7:].strip()
-                    if json_like_text.endswith("```"):
-                        json_like_text = json_like_text[:-3].strip()
-                elif json_like_text.startswith("```"):
-                    json_like_text = json_like_text[3:].strip()
-                    if json_like_text.endswith("```"):
-                        json_like_text = json_like_text[:-3].strip()
-                
-                data = json.loads(json_like_text) # Parse the found JSON-like segment
-                if "next_variable" in data and isinstance(data["next_variable"], str):
-                    return data["next_variable"].strip()
-        except json.JSONDecodeError:
-            # print(f"Warning: JSONDecodeError in parse_target_step (attempt 1) for: {raw_text}")
-            pass # Fall through
+                    json_like_text = json_like_text[7:-3].strip()
+                data = json.loads(json_like_text)
+                return str(data.get("next_variable", "")).strip()
         except Exception:
-            # print(f"Warning: Unexpected error in JSON parsing (attempt 1) for: {raw_text}")
             pass
-
+        # Other heuristic fallbacks unchanged...
         # Attempt 2: Look for $\boxed{\text{variable_name}}$
         boxed_text_match = re.search(r"\$\\boxed\{\text\{([_a-zA-Z0-9\s]+)\}\}\$", clean_raw_text)
         if boxed_text_match:
