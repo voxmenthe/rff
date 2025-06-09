@@ -25,7 +25,7 @@ class ProblemSpec(ABC):
         """Return symbolic representation of the ultimate goal."""
 
     @abstractmethod
-    def parse_workspace_update(self, raw_text: str) -> Workspace:
+    def parse_workspace_update(self, raw_text: str, state: Workspace) -> Workspace:
         """Parse raw LLM output into structured Workspace entries."""
 
     @abstractmethod
@@ -47,6 +47,10 @@ class ProblemSpec(ABC):
     @abstractmethod
     def parse_target_step(self, raw_text: str) -> str:
         """Parse raw LLM output from backward reasoning to get the next target variable name."""
+
+    @abstractmethod
+    def merge_aliases(self, state: Workspace) -> Workspace:
+        """Merge potential aliases inside state."""
 
 
 # Controller
@@ -78,7 +82,25 @@ def reason_from_future(
     goal: str = spec.derive_final_target(problem)  # Remains constant.
     avoid: Set[str] = set()
 
+    # Track how many times the LLM has failed to correctly provide a value for
+    # a given symbol.  Only after *max_fails_per_var* attempts do we blacklist
+    # that symbol so the model can try to repair earlier mistakes.
+    attempt_counts: dict[str, int] = {}
+    max_fails_per_var: int = 3  # configurable – allow one repair attempt.
+
+    stagnation_counter: int = 0
+    stagnation_window: int = 4  # soft-restart window
+
+    def register_fail(symbol: str) -> None:  # non-local helper
+        """Increment failure counter and add to avoid set when threshold hit."""
+        nonlocal attempt_counts, avoid
+        attempt_counts[symbol] = attempt_counts.get(symbol, 0) + 1
+        if attempt_counts[symbol] >= max_fails_per_var:
+            avoid.add(symbol)
+
     for _ in range(max_iters):
+        made_progress: bool = False  # track per-iteration progress
+
         # 1) If we already have the goal, try to verify and finish.
         if spec.check_local(state, goal):
             ok, answer_from_llm, gold_val_for_debug = spec.verify_final(state)
@@ -87,13 +109,13 @@ def reason_from_future(
             # If goal was present but incorrect, it will be added to avoid list later if not already.
             # This initial check is just to see if we already have the correct answer without an LLM call this iteration.
             # Wrong value present – blacklist and remove so we can try again.
-            avoid.add(goal)
+            register_fail(goal)
 
         # 1b) Try computing the goal directly with current knowledge (fast-fail)
         if goal not in avoid:
             direct_prompt = spec.prompt_forward_step(state, goal, avoid)
             direct_raw = llm_call(direct_prompt, model=model, verbose=verbose)
-            direct_state = state | spec.parse_workspace_update(direct_raw)
+            direct_state = state | spec.parse_workspace_update(direct_raw, state)
             if spec.check_local(direct_state, goal):
                 ok, answer_from_llm, gold_val_for_debug = spec.verify_final(direct_state)
                 if ok:
@@ -103,7 +125,7 @@ def reason_from_future(
             # Either not present or wrong – continue searching but keep any new
             # facts the model might have provided (besides a wrong goal).
             state = direct_state
-            avoid.add(goal)
+            register_fail(goal)
 
         # 2) Ask for the immediate prerequisite needed before we can compute
         #    the *goal* (not the previously returned prerequisite).
@@ -119,7 +141,7 @@ def reason_from_future(
         # 3) Ask the model to *compute* that prerequisite.
         r_prompt = spec.prompt_forward_step(state, target_step, avoid)
         forward_raw = llm_call(r_prompt, model=model, verbose=verbose)
-        parsed_update = spec.parse_workspace_update(forward_raw)
+        parsed_update = spec.parse_workspace_update(forward_raw, state)
 
         # Determine what variable the LLM actually provided a value for.
         llm_provided_var = None
@@ -143,18 +165,18 @@ def reason_from_future(
                 elif verbose: # Only print if verbose is on
                     print(f"INFO (after computing '{target_step}'): LLM proposed final_answer='{answer_from_llm}', but gold_answer='{gold_val_for_debug}'. Adding to avoid list.")
                 else: # Goal computed, but verification failed
-                    avoid.add(goal) # Avoid this incorrect goal value
+                    register_fail(goal)  # Allow retry up to threshold
                     # Also avoid the target_step that led to this incorrect goal, if different
                     if target_step != goal:
-                        avoid.add(target_step)
+                        register_fail(target_step)
                     # CRITICAL: Do not update 'state' with 'parsed_update' if it contained the incorrect goal.
                     # Since gsm8k.parse_workspace_update typically puts one var, parsed_update IS the incorrect goal.
                     # So, 'state' remains as it was before this attempt to compute 'goal' via 'target_step'.
                     continue
             else: # LLM provided goal var, but it failed check_local (e.g. wrong type, or not present in parsed_update)
-                avoid.add(goal)
+                register_fail(goal)
                 if target_step != goal:
-                    avoid.add(target_step)
+                    register_fail(target_step)
                 # 'state' also remains unchanged here.
                 continue
         elif llm_provided_var == target_step:
@@ -162,19 +184,35 @@ def reason_from_future(
             temp_state_for_target_step = state | parsed_update
             if spec.check_local(temp_state_for_target_step, target_step):
                 state = temp_state_for_target_step # Commit the new intermediate state
-                avoid.add(target_step)
+                register_fail(target_step)
+                made_progress = True
                 # Successfully added intermediate, loop to top to re-evaluate.
                 # This allows the logic at the start of the loop (1 & 1b) to check if 'goal' is now computable.
             else: # check_local failed for the target_step
-                avoid.add(target_step)
+                register_fail(target_step)
                 # Don't update state if check_local failed for the target_step
                 continue
         else:
             # LLM didn't provide 'goal' or 'target_step' in 'var', or provided nothing/malformed JSON.
             # This means the attempt to compute target_step effectively failed.
-            avoid.add(target_step)
+            register_fail(target_step)
             # Don't update state as the response was not useful for target_step
             continue
+
+        # -------- Post-iteration bookkeeping --------
+        # Merge potential aliases inside state (e.g. "initial_science_books" vs "science_books_before_bonus")
+        state = spec.merge_aliases(state)
+
+        if made_progress:
+            stagnation_counter = 0
+        else:
+            stagnation_counter += 1
+
+        # Soft-restart if stagnating
+        if stagnation_counter >= stagnation_window:
+            # Keep only those symbols that have permanently failed attempts
+            avoid = {s for s, cnt in attempt_counts.items() if cnt >= max_fails_per_var}
+            stagnation_counter = 0
 
     # If we exit the loop, we did not manage to find the correct answer.
     raise RuntimeError("RFF exhausted iterations without solution.")

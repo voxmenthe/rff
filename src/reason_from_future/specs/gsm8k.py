@@ -6,6 +6,8 @@ from typing import Dict, Set, Tuple
 from ..core import Workspace, ProblemSpec
 
 
+# flake8: noqa: E501
+
 class GSM8KSpec(ProblemSpec):
     """GSM8K ProblemSpec implementation for actual GSM8K evaluation."""
 
@@ -44,9 +46,13 @@ class GSM8KSpec(ProblemSpec):
         """
         return "final_answer"
 
-    def parse_workspace_update(self, raw_text: str) -> Workspace:
+    # ---------------------------------------------------------------------
+    # Parsing & local check upgrades: now we expect expression + value and
+    # evaluate expression numerically to verify the step.
+    # ---------------------------------------------------------------------
+    def parse_workspace_update(self, raw_text: str, state: Workspace) -> Workspace:
         """
-        Expect a JSON line like {"var": "x", "value": 123}.
+        Expect a JSON line like {"var": "x", "expr": "a + b", "value": 123}.
         NOTE: This parsing logic is simplistic for LLM-generated structured output.
         Real-world scenarios might require more robust parsing for natural language
         assignments or more complex data structures.
@@ -68,13 +74,21 @@ class GSM8KSpec(ProblemSpec):
             data = json.loads(clean_raw_text)
             var_name = data.get("var")
             var_value = data.get("value")
+            expr = data.get("expr")  # optional
 
-            if var_name and var_value is not None: # Ensure var and value exist
-                
-                # Optional: Convert value to float if it's a numeric string,
-                # but be careful if variables can have non-numeric string values.
-                # For GSM8K, values are typically numbers.
-                if isinstance(var_value, str):
+            if var_name and var_value is not None:
+                # Workhorse: if 'expr' present, evaluate under current state
+                if expr and isinstance(expr, str):
+                    try:
+                        # Build a safe eval namespace with numbers only
+                        safe_locals = {k: v for k, v in state.items() if isinstance(v, (int, float))}
+                        calculated = float(eval(expr, {}, safe_locals))
+                        if abs(calculated - float(var_value)) > 1e-4:
+                            # Mismatch – reject entire update
+                            return Workspace()
+                    except Exception:
+                        return Workspace()
+                elif isinstance(var_value, str):
                     try:
                         # Handle commas in numbers
                         var_value = float(var_value.replace(",", ""))
@@ -82,12 +96,6 @@ class GSM8KSpec(ProblemSpec):
                         pass # Keep as string if not purely numeric or if conversion fails
                 elif isinstance(var_value, (int, float)):
                     var_value = float(var_value)
-                # Attempt to convert value to float if it's a numeric string
-                # if isinstance(var_value, str):
-                #     try:
-                #         var_value = float(var_value.replace(",", ""))
-                #     except ValueError:
-                #         pass # Keep as string if not purely numeric
                 return Workspace({var_name: var_value})
         except json.JSONDecodeError:
             # print(f"Warning: JSONDecodeError in parse_workspace_update for: {raw_text}")
@@ -129,45 +137,31 @@ class GSM8KSpec(ProblemSpec):
         # print(f"Warning: Could not parse workspace update from: {raw_text}")
         return Workspace()
 
+    # ------------------------------------------------------------------
+    # Enhanced checks & alias merge utilities
+    # ------------------------------------------------------------------
+    def merge_aliases(self, state: Workspace) -> Workspace:
+        """Coalesce obviously synonymous variable names (heuristic)."""
+        if len(state) <= 1:
+            return state  # nothing to do
+
+        normalized_map: dict[str, str] = {}
+        for var in state:
+            norm = re.sub(r"(?:number|num|total|initial|before|after|of|the)", "", var.lower())
+            norm = re.sub(r"[_\s]+", "_", norm).strip("_")
+            normalized_map.setdefault(norm, var)
+
+        # If two vars normalize to same key, keep the first that is numerically consistent.
+        new_state = Workspace()
+        for norm_key, representative_var in normalized_map.items():
+            new_state[representative_var] = state[representative_var]
+        return new_state
+
     def check_local(self, state: Workspace, target_step: str) -> bool:
-        """Checks if the target_step (a variable name) is present in the current workspace state."""
-        return target_step in state
-
-    def verify_final(self, state: Workspace) -> Tuple[bool, str, float]:
-        """
-        Verifies the computed final answer against the gold numeric answer.
-        Returns: (is_correct, llm_answer_str, gold_answer_float)
-        """
-        guess_val = state.get(self.derive_final_target(self.question)) # Use derive_final_target for consistency
-        
-        if guess_val is None:
-            return False, "No final answer provided."
-
-        try:
-            # Attempt to convert the guess to a float for comparison
-            # LLM might output a number as int, float, or string representation of a number.
-            if isinstance(guess_val, str):
-                # Remove commas if present
-                guess_val_cleaned = guess_val.replace(",", "")
-                # Handle potential non-numeric strings gracefully
-                # Regex to check if string is a valid representation of a float/int
-                if not re.fullmatch(r"-?\d+(\.\d+)?", guess_val_cleaned): 
-                     return False, f"Invalid numeric format for final answer: {guess_val}"
-                numeric_guess = float(guess_val_cleaned)
-            elif isinstance(guess_val, (int, float)):
-                numeric_guess = float(guess_val) # Works for int and float
-            else: # if guess_val is not convertible (e.g. dict, list)
-                return False, f"Final answer '{guess_val}' has an unexpected type {type(guess_val).__name__}."
-
-        except ValueError: # Catch error if float conversion fails for a string
-            return False, f"Final answer '{guess_val}' is not a valid number."
-        
-        # Compare with the gold standard
-        # Using a small tolerance for float comparisons if necessary,
-        # but for GSM8K, answers are often integers or exact decimals.
-        is_correct = abs(numeric_guess - self.gold_numeric_answer) < 1e-5 # Tolerance for float comparison
-        
-        return is_correct, str(numeric_guess), self.gold_numeric_answer
+        """Now also ensures the value is numeric."""
+        if target_step not in state:
+            return False
+        return isinstance(state[target_step], (int, float))
 
     def prompt_last_step(self, state: Workspace, target: str, avoid: Set[str]) -> str:
         """
@@ -210,9 +204,14 @@ Your current task is to compute the value for the variable: "{target_step}".
 Based on the problem statement and the known facts, calculate this value.
 If you determine that the value of "{target_step}" is the final answer to the overall problem, use "{self.derive_final_target(self.question)}" as the 'var' in your JSON output. Otherwise, use "{target_step}" as the 'var'.
 
-Output your answer as a single JSON object with two keys: 'var' (which should be either the target variable name you were asked to compute, i.e., "{target_step}", or "{self.derive_final_target(self.question)}" if it's the final answer) and 'value' (the computed numerical value for this variable).
-For example, if asked to compute 'X' and X is the final answer: {{"var": "{self.derive_final_target(self.question)}", "value": 123.45}}
-If asked to compute 'Y' and Y is an intermediate step: {{"var": "Y", "value": 67.89}}
+Output your answer as a single JSON object with three keys: 'var', 'expr', and 'value'.
+  • 'var'  – either the target variable or "{self.derive_final_target(self.question)}" if it's final.
+  • 'expr' – a Python-style arithmetic expression that evaluates to the value **using only previously
+             known variables** (listed above). If the step is trivial or the final answer, just repeat the
+             numeric value as the expression.
+  • 'value' – the numerical result.
+For example, if asked to compute 'X' and X is the final answer: {{"var": "{self.derive_final_target(self.question)}", "expr": "a + b", "value": 123.45}}
+If asked to compute 'Y' and Y is an intermediate step: {{"var": "Y", "expr": "miles_driven / gallons", "value": 67.89}}
 Ensure the 'value' is a number, not a string containing an expression.
 
 IMPORTANT: Your *entire response* must be *only* the JSON object described above. Do not include any other text, explanations, reasoning, or conversational remarks before or after the JSON. Adhere strictly to this format.
@@ -272,3 +271,39 @@ IMPORTANT: Your *entire response* must be *only* the JSON object described above
         # For now, let's return a cleaned version of the last line or the whole text.
         # print(f"Warning: Could not parse target step reliably from: {raw_text}. Using fallback.")
         return lines[-1] if lines else clean_raw_text # Fallback to last line or original cleaned text
+
+    def verify_final(self, state: Workspace) -> Tuple[bool, str, float]:
+        """
+        Verifies the computed final answer against the gold numeric answer.
+        Returns: (is_correct, llm_answer_str, gold_answer_float)
+        """
+        guess_val = state.get(self.derive_final_target(self.question)) # Use derive_final_target for consistency
+        
+        if guess_val is None:
+            return False, "No final answer provided."
+
+        try:
+            # Attempt to convert the guess to a float for comparison
+            # LLM might output a number as int, float, or string representation of a number.
+            if isinstance(guess_val, str):
+                # Remove commas if present
+                guess_val_cleaned = guess_val.replace(",", "")
+                # Handle potential non-numeric strings gracefully
+                # Regex to check if string is a valid representation of a float/int
+                if not re.fullmatch(r"-?\d+(\.\d+)?", guess_val_cleaned): 
+                     return False, f"Invalid numeric format for final answer: {guess_val}"
+                numeric_guess = float(guess_val_cleaned)
+            elif isinstance(guess_val, (int, float)):
+                numeric_guess = float(guess_val) # Works for int and float
+            else: # if guess_val is not convertible (e.g. dict, list)
+                return False, f"Final answer '{guess_val}' has an unexpected type {type(guess_val).__name__}."
+
+        except ValueError: # Catch error if float conversion fails for a string
+            return False, f"Final answer '{guess_val}' is not a valid number."
+        
+        # Compare with the gold standard
+        # Using a small tolerance for float comparisons if necessary,
+        # but for GSM8K, answers are often integers or exact decimals.
+        is_correct = abs(numeric_guess - self.gold_numeric_answer) < 1e-5 # Tolerance for float comparison
+        
+        return is_correct, str(numeric_guess), self.gold_numeric_answer
