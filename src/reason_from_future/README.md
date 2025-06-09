@@ -18,15 +18,16 @@ A modular implementation of the **Reason-from-Future (RFF)** algorithm.  This pa
    source .venv/bin/activate
    ```
 
-2. Install the package in editable mode:
+2. Install the package using our prebuilt script:
    ```bash
-   pip install -e .
+   sh project_setup.sh
    ```
 
 3. Set your Gemini API key:
    ```bash
    export GEMINI_API_KEY="your_key_here"
    ```
+or add it to your local .env file.
 
 ---
 
@@ -74,4 +75,19 @@ To support a new problem domain, follow these steps:
 
 ---
 
-For more details, refer to `src/reason_from_future/core.py` the original design in `PLANS/inital_setup.md`, and the original paper in `PLANS/ReasonfromFuture-ReverseThoughtChainEnhancesLLMReasoning2506.03673v1.md`.
+## Conceptual Background and Relation to RFF Paper
+
+This project draws its core inspiration from the **Reason-from-Future (RFF)** paradigm, notably detailed in the paper *[Reason from Future: Reverse Thought Chain Enhances LLM Reasoning](PLANS/ReasonfromFuture-ReverseThoughtChainEnhancesLLMReasoning2506.03673v1.md)*. The paper proposes a bidirectional reasoning approach where reverse thinking (identifying a step just before the target) guides forward reasoning to enhance LLM problem-solving by providing global context and constraining the search space.
+
+Our implementation embraces this foundational idea but expands upon it by providing a **modular and extensible framework**:
+
+*   **Domain-Agnostic Controller:** At its heart, our package features a generic `reason_from_future` controller. This controller orchestrates the RFF flow without being tied to a specific problem type.
+*   **`ProblemSpec` Abstraction:** The key to this generality is the `ProblemSpec` interface. Users can integrate new problem domains by implementing this interface, defining how the problem is decomposed, how steps are generated, and how states are verified. This contrasts with the paper's more direct application of RFF to specific tasks like Game of 24 and GSM8K.
+*   **Generalized RFF Cycle:** Our controller implements a cycle of:
+    1.  **Reverse Planning (G):** The `ProblemSpec.prompt_last_step` method asks the LLM to identify a plausible precursor step (the "last step") required to achieve the current target.
+    2.  **Forward Stepping (R):** The `ProblemSpec.prompt_forward_step` method then instructs the LLM to generate the reasoning or action to reach this identified precursor step.
+    3.  **Local Check (C):** `ProblemSpec.check_local` verifies if the forward step successfully achieved the precursor. The `Workspace` object manages the evolving state.
+*   **Flexibility over Specific RFF Variants:** The paper details RFF-T (for tree-like searches with backtracking) and RFF-G (for graph-like accumulation of knowledge). Our framework is designed to be flexible. While the controller itself is general, `ProblemSpec` implementations can incorporate logic to emulate these behaviors (e.g., using the `avoid` mechanism in prompts for RFF-T-like exploration, or designing `Workspace` updates and `parse_workspace_update` for RFF-G-like information accumulation).
+*   **Expansion and Evolution:** This project has evolved to include a more general problem-solving module and has seen specific enhancements, such as to the `GSM8KSpec`. This reflects an ongoing effort to refine and broaden the applicability of the RFF approach beyond the initial concepts presented in the paper. The `Workspace` abstraction also provides a more structured approach to state management than implicitly described in the paper's algorithms.
+
+In essence, while the original paper introduced the RFF concept and demonstrated its efficacy, this package aims to provide a robust, reusable, and adaptable toolkit for applying and experimenting with Reason-from-Future style reasoning across diverse challenges.
