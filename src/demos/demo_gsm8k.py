@@ -1,12 +1,12 @@
 from reason_from_future.core import reason_from_future
 from reason_from_future.specs.gsm8k import GSM8KSpec
 
-simple_sample = {
+simple = {
     "question": "There were 15 trees in the grove. 3 were cut down. Then, after some time, 2 more were cut down. But 1 grew back. How many are left?",
     "answer": "11",
 }
 
-harder_sample = {
+medium = {
     "question": """A school library ordered 600 new books for three new sections: Fiction, Science, and History. Exactly half of the order was Fiction. The remaining books were split equally between Science and History.
     During shipping the library discovered that
     10 percent of the Fiction books and 10 percent of the Science books were damaged, and
@@ -21,13 +21,13 @@ harder_sample = {
     "answer": "198", 
 }
 
-very_hard = {
-    "question": """If the sum of the smallest and largest of five consecutive even numbers is 76, what is the value of the second largest number in the series?""",
-    "answer": "40",
+medium_2 = {
+    "question": """If the sum of the smallest and largest of five consecutive even numbers is 76, what is the value of the second largest number in the series added to the smallest number in the series?""",
+    "answer": "74"
 }
 
 
-CURRENT_SAMPLE = very_hard
+CURRENT_SAMPLE = medium_2
 
 def main(verbose=True):
     spec = GSM8KSpec(CURRENT_SAMPLE)

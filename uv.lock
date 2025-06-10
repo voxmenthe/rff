@@ -388,88 +388,6 @@ wheels = [
 ]
 
 [[package]]
-name = "cot-scaffold"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "beautifulsoup4" },
-    { name = "chromium" },
-    { name = "db-dtypes" },
-    { name = "einops" },
-    { name = "fastapi" },
-    { name = "google-cloud-aiplatform" },
-    { name = "gunicorn" },
-    { name = "htmltools" },
-    { name = "instructor" },
-    { name = "ipykernel" },
-    { name = "ipywidgets" },
-    { name = "matplotlib" },
-    { name = "mechanicalsoup" },
-    { name = "notebook" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "playwright" },
-    { name = "pytest-cov" },
-    { name = "python-dotenv" },
-    { name = "python-json-logger" },
-    { name = "ratelimit" },
-    { name = "requests" },
-    { name = "requests-html" },
-    { name = "scikit-learn" },
-    { name = "scrapy" },
-    { name = "seaborn" },
-    { name = "selenium", version = "4.32.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
-    { name = "selenium", version = "4.33.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
-    { name = "sentence-transformers" },
-    { name = "shiny" },
-    { name = "torch" },
-    { name = "torchaudio" },
-    { name = "torchvision" },
-    { name = "transformers" },
-    { name = "unsloth" },
-    { name = "uvicorn" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "beautifulsoup4" },
-    { name = "chromium" },
-    { name = "db-dtypes" },
-    { name = "einops" },
-    { name = "fastapi" },
-    { name = "google-cloud-aiplatform" },
-    { name = "gunicorn" },
-    { name = "htmltools" },
-    { name = "instructor" },
-    { name = "ipykernel" },
-    { name = "ipywidgets" },
-    { name = "matplotlib" },
-    { name = "mechanicalsoup" },
-    { name = "notebook" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "playwright" },
-    { name = "pytest-cov" },
-    { name = "python-dotenv" },
-    { name = "python-json-logger" },
-    { name = "ratelimit" },
-    { name = "requests" },
-    { name = "requests-html" },
-    { name = "scikit-learn" },
-    { name = "scrapy" },
-    { name = "seaborn" },
-    { name = "selenium" },
-    { name = "sentence-transformers" },
-    { name = "shiny" },
-    { name = "torch" },
-    { name = "torchaudio" },
-    { name = "torchvision" },
-    { name = "transformers" },
-    { name = "unsloth" },
-    { name = "uvicorn" },
-]
-
-[[package]]
 name = "coverage"
 version = "7.8.2"
 source = { registry = "https://pypi.org/simple" }
@@ -753,6 +671,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/00/f7/27f15d41f0ed38e8fcc488584b57e902b331da7f7c6dcda53721b15838fc/fsspec-2025.5.1.tar.gz", hash = "sha256:2e55e47a540b91843b755e83ded97c6e897fa0942b11490113f09e9c443c2475", size = 303033 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bb/61/78c7b3851add1481b048b5fdc29067397a1784e2910592bc81bb3f608635/fsspec-2025.5.1-py3-none-any.whl", hash = "sha256:24d3a2e663d5fc735ab256263c4075f374a174c3410c0b25e5bd1970bceaa462", size = 199052 },
+]
+
+[[package]]
+name = "google"
+version = "3.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "beautifulsoup4" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/89/97/b49c69893cddea912c7a660a4b6102c6b02cd268f8c7162dd70b7c16f753/google-3.0.0.tar.gz", hash = "sha256:143530122ee5130509ad5e989f0512f7cb218b2d4eddbafbad40fd10e8d8ccbe", size = 44978 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ac/35/17c9141c4ae21e9a29a43acdfd848e3e468a810517f862cad07977bf8fe9/google-3.0.0-py2.py3-none-any.whl", hash = "sha256:889cf695f84e4ae2c55fbc0cfdaf4c1e729417fa52ab1db0485202ba173e4935", size = 45258 },
 ]
 
 [[package]]
@@ -2946,6 +2876,92 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/da/88/f270de456dd7d11dcc808abfa291ecdd3f45ff44e3b549ffa01b126464d0/rfc3986_validator-0.1.1.tar.gz", hash = "sha256:3d44bde7921b3b9ec3ae4e3adca370438eccebc676456449b145d533b240d055", size = 6760 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9e/51/17023c0f8f1869d8806b979a2bffa3f861f26a3f1a66b094288323fba52f/rfc3986_validator-0.1.1-py2.py3-none-any.whl", hash = "sha256:2f235c432ef459970b4306369336b9d5dbdda31b510ca1e327636e01f528bfa9", size = 4242 },
+]
+
+[[package]]
+name = "rff"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "beautifulsoup4" },
+    { name = "chromium" },
+    { name = "db-dtypes" },
+    { name = "einops" },
+    { name = "fastapi" },
+    { name = "google" },
+    { name = "google-cloud-aiplatform" },
+    { name = "google-genai" },
+    { name = "gunicorn" },
+    { name = "htmltools" },
+    { name = "instructor" },
+    { name = "ipykernel" },
+    { name = "ipywidgets" },
+    { name = "matplotlib" },
+    { name = "mechanicalsoup" },
+    { name = "notebook" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "playwright" },
+    { name = "pytest-cov" },
+    { name = "python-dotenv" },
+    { name = "python-json-logger" },
+    { name = "ratelimit" },
+    { name = "requests" },
+    { name = "requests-html" },
+    { name = "scikit-learn" },
+    { name = "scrapy" },
+    { name = "seaborn" },
+    { name = "selenium", version = "4.32.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
+    { name = "selenium", version = "4.33.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
+    { name = "sentence-transformers" },
+    { name = "shiny" },
+    { name = "torch" },
+    { name = "torchaudio" },
+    { name = "torchvision" },
+    { name = "transformers" },
+    { name = "unsloth" },
+    { name = "uvicorn" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "beautifulsoup4" },
+    { name = "chromium" },
+    { name = "db-dtypes" },
+    { name = "einops" },
+    { name = "fastapi" },
+    { name = "google" },
+    { name = "google-cloud-aiplatform" },
+    { name = "google-genai" },
+    { name = "gunicorn" },
+    { name = "htmltools" },
+    { name = "instructor" },
+    { name = "ipykernel" },
+    { name = "ipywidgets" },
+    { name = "matplotlib" },
+    { name = "mechanicalsoup" },
+    { name = "notebook" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "playwright" },
+    { name = "pytest-cov" },
+    { name = "python-dotenv" },
+    { name = "python-json-logger" },
+    { name = "ratelimit" },
+    { name = "requests" },
+    { name = "requests-html" },
+    { name = "scikit-learn" },
+    { name = "scrapy" },
+    { name = "seaborn" },
+    { name = "selenium" },
+    { name = "sentence-transformers" },
+    { name = "shiny" },
+    { name = "torch" },
+    { name = "torchaudio" },
+    { name = "torchvision" },
+    { name = "transformers" },
+    { name = "unsloth" },
+    { name = "uvicorn" },
 ]
 
 [[package]]

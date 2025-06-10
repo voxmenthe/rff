@@ -8,6 +8,7 @@ A modular implementation of the **Reason-from-Future (RFF)** algorithm.  This pa
 - Example `ProblemSpec` subclasses in `reason_from_future.specs`:
   - `Game24Spec` (reach 24 from four integers)
   - `GSM8KSpec` (toy math word problem)
+  - `GeneralProblemSolvingSpec` (system design, planning, decision making)
 
 ---
 
@@ -77,7 +78,7 @@ To support a new problem domain, follow these steps:
 
 ## Conceptual Background and Relation to RFF Paper
 
-This project draws its core inspiration from the **Reason-from-Future (RFF)** paradigm, notably detailed in the paper *[Reason from Future: Reverse Thought Chain Enhances LLM Reasoning](PLANS/ReasonfromFuture-ReverseThoughtChainEnhancesLLMReasoning2506.03673v1.md)*. The paper proposes a bidirectional reasoning approach where reverse thinking (identifying a step just before the target) guides forward reasoning to enhance LLM problem-solving by providing global context and constraining the search space.
+This project draws its core inspiration from the **Reason-from-Future (RFF)** paradigm, notably detailed in the paper *[Reason from Future: Reverse Thought Chain Enhances LLM Reasoning](https://arxiv.org/abs/2506.03673)*. The paper proposes a bidirectional reasoning approach where reverse thinking (identifying a step just before the target) guides forward reasoning to enhance LLM problem-solving by providing global context and constraining the search space.
 
 Our implementation embraces this foundational idea but expands upon it by providing a **modular and extensible framework**:
 
@@ -90,4 +91,4 @@ Our implementation embraces this foundational idea but expands upon it by provid
 *   **Flexibility over Specific RFF Variants:** The paper details RFF-T (for tree-like searches with backtracking) and RFF-G (for graph-like accumulation of knowledge). Our framework is designed to be flexible. While the controller itself is general, `ProblemSpec` implementations can incorporate logic to emulate these behaviors (e.g., using the `avoid` mechanism in prompts for RFF-T-like exploration, or designing `Workspace` updates and `parse_workspace_update` for RFF-G-like information accumulation).
 *   **Expansion and Evolution:** This project has evolved to include a more general problem-solving module and has seen specific enhancements, such as to the `GSM8KSpec`. This reflects an ongoing effort to refine and broaden the applicability of the RFF approach beyond the initial concepts presented in the paper. The `Workspace` abstraction also provides a more structured approach to state management than implicitly described in the paper's algorithms.
 
-In essence, while the original paper introduced the RFF concept and demonstrated its efficacy, this package aims to provide a robust, reusable, and adaptable toolkit for applying and experimenting with Reason-from-Future style reasoning across diverse challenges.
+The original paper introduced the RFF concept and demonstrated its efficacy. This package aims to provide a robust, reusable, and adaptable toolkit for applying and experimenting with Reason-from-Future style reasoning across diverse challenges.

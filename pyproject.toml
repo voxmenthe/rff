@@ -1,7 +1,7 @@
 [project]
-name = "cot-scaffold"
+name = "rff"
 version = "0.1.0"
-description = "CoT Scaffold"
+description = "Reason-from-Future"
 readme = "README.md"
 requires-python = ">=3.13.3,<3.14"
 authors = [
@@ -15,7 +15,9 @@ dependencies = [
     "einops",
     "fastapi",
     "gunicorn", 
+    "google",
     "google-cloud-aiplatform",
+    "google-genai",
     "htmltools",
     "ipykernel",
     "ipywidgets",
