@@ -44,6 +44,13 @@ answer = reason_from_future("Reach 24 with numbers [1,3,6,11]", spec)
 print("Solution:", answer)
 ```
 
+# Demos - there are several demo scripts in `src/demos`.
+```bash
+uv run src/demos/demo_game24.py
+uv run src/demos/demo_gsm8k.py
+uv run src/demos/demo_general.py
+```
+
 ---
 
 ## Adding a New `ProblemSpec`
