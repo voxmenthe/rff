@@ -2,9 +2,7 @@ import re
 from typing import List, Tuple, Type
 
 from reason_from_future.core import reason_from_future
-from reason_from_future.specs import Game24Spec, GSM8KSpec, CodeWritingSpec
-from reason_from_future.specs.general_problem_solving import GeneralProblemSolvingSpec
-
+from reason_from_future.specs import Game24Spec, GSM8KSpec, CodeWritingSpec, GeneralProblemSolvingSpec
 
 SpecEntry = Tuple[str, Type]
 
