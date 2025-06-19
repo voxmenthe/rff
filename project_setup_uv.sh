@@ -8,7 +8,7 @@ echo "Setting up Python project with uv..."
 if ! command -v uv &> /dev/null; then
     echo "uv is not installed. Installing uv..."
     curl -LsSf https://astral.sh/uv/install.sh | sh
-    source $HOME/.cargo/env
+    #source $HOME/.cargo/env
 fi
 
 
