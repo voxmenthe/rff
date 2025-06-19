@@ -7,10 +7,56 @@ from .llm import llm_call
 
 
 class Workspace(dict):
-    """Scratch-pad for intermediate facts and states."""
+    """Scratch-pad for intermediate facts and states.
 
+    Acts like a dictionary but also exposes helper accessors expected by some
+    `ProblemSpec` implementations (e.g. `CodeWritingSpec`).
+    """
+
+    # -------------------- Mutation helpers --------------------
     def add(self, key: str, val: Any) -> None:
+        """Store *val* under *key* (alias for ``self[key] = val``)."""
         self[key] = val
+
+    # -------------------- Accessors expected by specs --------------------
+    def get_all_data(self) -> dict[str, Any]:
+        """Return the entire workspace state as a plain ``dict``.
+
+        Some spec code calls :py:meth:`get_all_data` to decide whether any data
+        are present.  Since :class:`Workspace` is already a ``dict`` subclass
+        we can simply return ``self``.
+        """
+        return self
+
+    def get_internal_state_DEBUG(self) -> dict[str, Any]:
+        """Debug helper that mirrors :py:meth:`get_all_data` for backwards-compat."""
+        return self
+
+    # -------------------- dict union (``|``) operators --------------------
+    def __or__(self, other: dict[str, Any]):  # type: ignore[override]
+        """Return a *new* Workspace containing the keys from *self* updated with *other*.
+
+        Python's built-in ``dict.__or__`` returns a plain ``dict`` which causes
+        the resulting value to lose the helper methods we add here.  By
+        overriding we ensure the result stays a :class:`Workspace` instance.
+        """
+        combined = Workspace()
+        combined.update(self)
+        if isinstance(other, dict):
+            combined.update(other)
+        else:
+            raise TypeError("Can only merge Workspace with dict-like object using '|'")
+        return combined
+
+    def __ror__(self, other: dict[str, Any]):  # type: ignore[override]
+        """Right-hand union operator to support ``dict | Workspace``."""
+        combined = Workspace()
+        if isinstance(other, dict):
+            combined.update(other)
+        else:
+            raise TypeError("Can only merge Workspace with dict-like object using '|'")
+        combined.update(self)
+        return combined
 
 
 class LocalCheckFail(Exception):

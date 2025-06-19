@@ -35,6 +35,45 @@ class CodeWritingSpec(ProblemSpec):
         }
 
     def derive_final_target(self, problem: str) -> str:
+        """Return the final target step name for the given problem.
+
+        Heuristic:
+        1. If the problem statement (or requirements) clearly asks for implementation
+           of a single function that is named explicitly (e.g. "function should be named 'factorial'"),
+           return an `implement_function_<function_name>` target so that the planning
+           loop focuses directly on implementing that function.
+        2. Otherwise, fall back to the generic "complete_code_solution" which is
+           appropriate for multi-module / multi-file projects.
+        """
+        # Try to detect an explicitly named function in the problem statement such as
+        # "function should be named 'factorial'" or "named \"my_func\"".
+        # The regex looks for quoted identifiers followed by the word "function" (optionally plural).
+        import re
+
+        # 1. Look for wording like "function should be named 'foo'" or similar.
+        patterns = [
+            r"function\s+should\s+be\s+named\s+['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]",
+            r"function\s+must\s+be\s+named\s+['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]",
+            r"['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]\s*(?:function|func)",
+        ]
+
+        for pat in patterns:
+            m = re.search(pat, problem, re.IGNORECASE)
+            if m:
+                func_name = m.group(1)
+                if 1 <= len(func_name) <= 50:
+                    return f"implement_function_{func_name}"
+
+        # 2. Check explicit requirements list for the same pattern.
+        for req in getattr(self, "requirements", []):
+            for pat in patterns:
+                m = re.search(pat, req, re.IGNORECASE)
+                if m:
+                    func_name = m.group(1)
+                    if 1 <= len(func_name) <= 50:
+                        return f"implement_function_{func_name}"
+
+        # Default generic target
         return "complete_code_solution"
 
     def parse_workspace_update(self, raw_text: str, state: Workspace) -> Workspace:
@@ -53,7 +92,7 @@ class CodeWritingSpec(ProblemSpec):
 
             if not json_match:
                 # Heuristic: if it's a large block of code, assume it's the solution
-                if "solution_code" in state.workspace_schema and isinstance(raw_text, str) and len(raw_text.splitlines()) > 3:
+                if isinstance(raw_text, str) and len(raw_text.splitlines()) > 3:
                     if any(kw in raw_text for kw in ["def ", "class ", "import ", "{", "}"]) or raw_text.startswith("```"):
                          code_content = raw_text
                          if raw_text.startswith("```") and raw_text.endswith("```"):
@@ -397,9 +436,13 @@ class CodeWritingSpec(ProblemSpec):
         elif target_step.startswith("implement_function_"):
             function_name = target_step[len("implement_function_"):]
             functions = state.get("functions", {})
-            return function_name in functions and \
+            done = function_name in functions and \
                    isinstance(functions[function_name], dict) and \
                    bool(functions[function_name].get("body", "").strip())
+            # Record a simple completion marker so the controller can retrieve it.
+            if done:
+                state[target_step] = f"function '{function_name}' implemented"
+            return done
 
         elif target_step.startswith("define_class_"):
             class_name = target_step[len("define_class_"):]
@@ -524,18 +567,3 @@ class CodeWritingSpec(ProblemSpec):
         return is_acceptable, solution_description, normalized_score
 
 
-    def prompt_last_step(self, state: Workspace, target: str, avoid: Set[str]) -> str:
-        # To be implemented
-        return "Define the next coding task."
-
-    def prompt_forward_step(self, state: Workspace, target_step: str, avoid: Set[str]) -> str:
-        # To be implemented
-        return f"Implement {target_step}."
-
-    def parse_target_step(self, raw_text: str) -> str:
-        # To be implemented
-        return ""
-
-    def merge_aliases(self, state: Workspace) -> Workspace:
-        # To be implemented
-        return state
