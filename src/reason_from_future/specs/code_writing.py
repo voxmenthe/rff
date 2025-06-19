@@ -9,7 +9,7 @@ from ..core import ProblemSpec, Workspace
 class CodeWritingSpec(ProblemSpec):
     """
     ProblemSpec for generating code.
-
+    
     The workspace will maintain a structure for:
     - Modules: Code files and their contents.
     - Functions: Signatures, descriptions, and bodies.
@@ -39,7 +39,7 @@ class CodeWritingSpec(ProblemSpec):
 
     def parse_workspace_update(self, raw_text: str, state: Workspace) -> Workspace:
         clean_text = raw_text.strip()
-
+        
         if not state:
             state = Workspace(self.workspace_schema.copy())
 
@@ -59,10 +59,10 @@ class CodeWritingSpec(ProblemSpec):
                          if raw_text.startswith("```") and raw_text.endswith("```"):
                              code_content = raw_text[raw_text.find('\n')+1:-3].strip()
                          state["solution_code"] = code_content
-                return state
+                return state 
 
             json_text = json_match.group(1)
-
+            
             update = json.loads(json_text)
             update_type = update.get("update_type", "")
 
@@ -74,7 +74,7 @@ class CodeWritingSpec(ProblemSpec):
                         "content": update.get("content", ""),
                         "description": update.get("description", "")
                     }
-
+            
             elif update_type == "function":
                 name = update.get("name")
                 if name:
@@ -92,7 +92,7 @@ class CodeWritingSpec(ProblemSpec):
                     if "classes" not in state: state["classes"] = {}
                     state["classes"][name] = {
                         "attributes": update.get("attributes", {}),
-                        "methods": update.get("methods", []),
+                        "methods": update.get("methods", []), 
                         "description": update.get("description", ""),
                         "module": update.get("module")
                     }
@@ -106,7 +106,7 @@ class CodeWritingSpec(ProblemSpec):
                         "expected_output": update.get("expected_output", ""),
                         "target_element": update.get("target_element", "")
                     }
-
+            
             elif update_type == "decision":
                 name = update.get("name")
                 if name:
@@ -124,22 +124,22 @@ class CodeWritingSpec(ProblemSpec):
                         "depends_on": update.get("depends_on", []),
                         "type": update.get("type", "")
                     }
-
+            
             elif update_type == "solution_code":
                 code = update.get("code")
                 if code is not None:
                     state["solution_code"] = code
-
+            
             elif update_type == "batch":
                 sub_updates = update.get("updates", [])
                 if not isinstance(sub_updates, list):
                     return state
-
+                
                 for sub_update_item in sub_updates:
                     if isinstance(sub_update_item, dict):
                         sub_update_json_str = json.dumps(sub_update_item)
                         state = self.parse_workspace_update(sub_update_json_str, state)
-
+            
         except (json.JSONDecodeError, KeyError, TypeError) as e:
             pass
 
@@ -164,7 +164,7 @@ class CodeWritingSpec(ProblemSpec):
                 content_len = len(details.get("content", ""))
                 desc = details.get("description", "No description")
                 summary_parts.append(f"  - Module '{name}': {content_len} chars, Description: {desc}")
-
+        
         if functions:
             summary_parts.append("\nCurrent Functions:")
             for name, details in functions.items():
@@ -206,7 +206,7 @@ class CodeWritingSpec(ProblemSpec):
 
         Ultimate Goal: {target}
 
-        Based on the current status and the ultimate goal, what is the MOST CRITICAL next coding task to undertake?
+        Based on the current status and the ultimate goal, what is the MOST CRITICAL next coding task to undertake? 
         Consider dependencies: e.g., a function cannot be implemented if its module isn't defined; tests cannot be written for a function that doesn't exist.
         Prioritize foundational elements first (modules, class shells, function signatures) before detailed implementations if they are missing.
         If foundational elements are in place, prioritize implementing core logic or writing tests for existing components.
@@ -237,7 +237,7 @@ class CodeWritingSpec(ProblemSpec):
             module_name = target_step[len("define_module_"):]
             task_instructions = f"Define the module '{module_name}'. Provide its full code content and a brief description."
             output_example = {"update_type": "module", "name": module_name, "content": "...", "description": "..."}
-
+        
         elif target_step.startswith("implement_function_"):
             # e.g. implement_function_my_func_in_module_utils
             # e.g. implement_function_my_func
@@ -257,7 +257,7 @@ class CodeWritingSpec(ProblemSpec):
             class_name_parts = target_step[len("define_class_"):].split("_in_module_")
             class_name = class_name_parts[0]
             module_name = class_name_parts[1] if len(class_name_parts) > 1 else None
-
+            
             task_instructions = f"Define the class '{class_name}'."
             if module_name:
                 task_instructions += f" This class belongs to module '{module_name}'."
@@ -281,7 +281,7 @@ class CodeWritingSpec(ProblemSpec):
             element_name = target_step[len("write_tests_for_"):]
             task_instructions = f"Write test cases for '{element_name}'. For each test, provide a name, input(s), expected output, and the target element it tests."
             output_example = {"update_type": "test_case", "name": "test_my_scenario", "input": "...", "expected_output": "...", "target_element": element_name}
-
+        
         elif target_step.startswith("decide_on_"):
             decision_name = target_step[len("decide_on_"):]
             task_instructions = f"Make a decision on '{decision_name}'. Provide your choice and a clear rationale for it."
@@ -290,7 +290,7 @@ class CodeWritingSpec(ProblemSpec):
         elif target_step == "complete_code_solution":
             task_instructions = "Provide the final, complete code solution. This could be a single block of code, or if the project is structured into modules, ensure all module definitions are up-to-date or provide instructions on how to assemble them."
             output_example = {"update_type": "solution_code", "code": "final code string or assembly instructions"}
-
+        
         # TODO: Add more specific task types like "refactor_", "implement_method_in_class" etc.
 
         prompt = f"""\
@@ -342,7 +342,7 @@ class CodeWritingSpec(ProblemSpec):
             line = line.strip()
             # Common prefixes for tasks
             task_prefixes = [
-                "define_module_", "implement_function_", "define_class_",
+                "define_module_", "implement_function_", "define_class_", 
                 "implement_method_", "write_tests_for_", "decide_on_", "refactor_"
             ]
             for prefix in task_prefixes:
@@ -350,8 +350,8 @@ class CodeWritingSpec(ProblemSpec):
                     # Basic validation: ensure it's not just the prefix
                     # and doesn't contain problematic characters (e.g. often LLMs add "...")
                     if "..." not in line and " " not in line[len(prefix):]: # Avoid spaces in task names
-                        return line
-
+                        return line 
+        
         # Fallback 2: Return the last non-empty line if it seems like a plausible task
         if lines:
             last_line = lines[-1].strip()
@@ -414,7 +414,7 @@ class CodeWritingSpec(ProblemSpec):
             test_cases = state.get("test_cases", {})
             if not test_cases or not isinstance(test_cases, dict):
                 return False
-            return any(isinstance(tc, dict) and tc.get("target_element") == element_name
+            return any(isinstance(tc, dict) and tc.get("target_element") == element_name 
                        for tc in test_cases.values())
 
         elif target_step.startswith("decide_on_"):
@@ -424,7 +424,7 @@ class CodeWritingSpec(ProblemSpec):
                    isinstance(decisions[decision_name], dict) and \
                    bool(decisions[decision_name].get("choice", "").strip()) and \
                    bool(decisions[decision_name].get("rationale", "").strip())
-
+        
         normalized_target = target_step.replace(" ", "_").lower()
         for category_key in ["modules", "functions", "classes", "decisions"]:
             category = state.get(category_key)
@@ -433,10 +433,10 @@ class CodeWritingSpec(ProblemSpec):
                 if isinstance(item, dict):
                     return any(bool(v) for k, v in item.items() if k not in ['name', 'description', 'module'])
                 elif isinstance(item, str):
-                    return bool(item.strip())
-                elif bool(item):
+                    return bool(item.strip()) 
+                elif bool(item): 
                     return True
-
+        
         return self._find_in_nested_dict(state.get_internal_state_DEBUG(), normalized_target)
 
 
@@ -480,7 +480,6 @@ class CodeWritingSpec(ProblemSpec):
 
         has_solution_code = bool(solution_code.strip())
         has_modules = bool(modules)
-
         if not has_solution_code and not has_modules:
             return False, "No complete code solution found (no solution_code or populated modules).", 0.0
 
